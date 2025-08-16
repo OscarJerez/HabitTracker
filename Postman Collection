@@ -1,0 +1,427 @@
+{
+	"info": {
+		"_postman_id": "792534b4-9857-42b5-945f-f5d0c7cf8046",
+		"name": "Habit Tracker API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "43163359"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Auth/login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// 1) basic status check\r",
+									"pm.test(\"Status is 200 or 201\", function () {\r",
+									"  pm.expect(pm.response.code).to.be.oneOf([200, 201]);\r",
+									"});\r",
+									"\r",
+									"// 2) parse response JSON safely\r",
+									"let json = {};\r",
+									"try { json = pm.response.json(); } catch (e) {}\r",
+									"\r",
+									"// 3) grab token from common fields (adjust here if your field name is different)\r",
+									"const token =\r",
+									"  json.token ||\r",
+									"  json.accessToken ||\r",
+									"  json.jwt ||\r",
+									"  (json.data && (json.data.token || json.data.accessToken));\r",
+									"\r",
+									"pm.test(\"Token returned\", function () {\r",
+									"  pm.expect(token, \"token\").to.exist;\r",
+									"});\r",
+									"\r",
+									"// 4) save token to collection variables\r",
+									"if (token) {\r",
+									"  pm.collectionVariables.set(\"jwtToken\", token);\r",
+									"}\r",
+									"\r",
+									"// 5) try to grab userId (either from response or by decoding JWT)\r",
+									"let uid =\r",
+									"  json.userId ||\r",
+									"  (json.data && json.data.userId) ||\r",
+									"  null;\r",
+									"\r",
+									"// decode JWT payload if still missing\r",
+									"if (!uid && token) {\r",
+									"  try {\r",
+									"    const base64Url = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');\r",
+									"    const payload = JSON.parse(atob(base64Url));\r",
+									"    uid = payload.sub || payload.nameid || payload.userId || payload.uid || null;\r",
+									"  } catch (e) { /* ignore */ }\r",
+									"}\r",
+									"\r",
+									"if (uid) {\r",
+									"  pm.collectionVariables.set(\"userId\", uid);\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"emailAddress\": \"{{emailAddress}}\",\r\n  \"password\": \"{{password}}\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/Auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"Auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/Auth/register",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"emailAddress\": \"{{emailAddress}}\",\r\n  \"password\": \"{{password}}\",\r\n  \"confirmPassword\": \"{{password}}\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/Auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"Auth",
+								"register"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Habits",
+			"item": [
+				{
+					"name": "Create Habit",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// ensure userId exists before sending the body\r",
+									"let uid = pm.collectionVariables.get(\"userId\");\r",
+									"if (!uid) {\r",
+									"  const t = pm.collectionVariables.get(\"jwtToken\");\r",
+									"  if (t) {\r",
+									"    try {\r",
+									"      const base64Url = t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');\r",
+									"      const payload = JSON.parse(atob(base64Url));\r",
+									"      uid = payload.sub || payload.nameid || payload.userId || payload.uid || null;\r",
+									"      if (uid) pm.collectionVariables.set(\"userId\", uid);\r",
+									"    } catch (e) { /* ignore */ }\r",
+									"  }\r",
+									"}\r",
+									"pm.expect(pm.collectionVariables.get(\"userId\"), \"userId is required\").to.exist;\r",
+									"\r",
+									"pm.test(\"Created\", () => pm.expect(pm.response.code).to.be.oneOf([200,201]));\r",
+									"const j = pm.response.json();\r",
+									"if (j && j.data && j.data.id) {\r",
+									"  pm.collectionVariables.set(\"habitId\", j.data.id);\r",
+									"}\r",
+									"pm.test(\"habitId saved\", () => pm.expect(pm.collectionVariables.get(\"habitId\")).to.exist);\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"title\": \"Morning Run\",\r\n  \"description\": \"Run 5km every morning\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/Habit?userId={{userId}}\n",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"Habit"
+							],
+							"query": [
+								{
+									"key": "userId",
+									"value": "{{userId}}\n"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Habits by User",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/Habit/{{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"Habit",
+								"{{userId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Habit",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"let uid = pm.collectionVariables.get(\"userId\");\r",
+									"if (!uid) {\r",
+									"  const t = pm.collectionVariables.get(\"jwtToken\");\r",
+									"  if (t) {\r",
+									"    try {\r",
+									"      const payload = JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));\r",
+									"      uid = payload.sub || payload.nameid || payload.userId || payload.uid || null;\r",
+									"      if (uid) pm.collectionVariables.set(\"userId\", uid);\r",
+									"    } catch {}\r",
+									"  }\r",
+									"}\r",
+									"pm.expect(pm.collectionVariables.get(\"userId\"), \"userId is required\").to.exist;\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"title\": \"Evening Run\",\r\n  \"description\": \"Run 3km every evening\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/Habit/{{habitId}}?userId={{userId}}\n",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"Habit",
+								"{{habitId}}"
+							],
+							"query": [
+								{
+									"key": "userId",
+									"value": "{{userId}}\n"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Habit",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const ok = [200,204].includes(pm.response.code);\r",
+									"pm.test(\"Deleted\", () => pm.expect(ok).to.be.true);\r",
+									"if (ok) pm.collectionVariables.unset(\"habitId\"); // clear after delete\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/Habit/{{habitId}}?userId={{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"Habit",
+								"{{habitId}}"
+							],
+							"query": [
+								{
+									"key": "userId",
+									"value": "{{userId}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"auth": {
+				"type": "bearer",
+				"bearer": [
+					{
+						"key": "token",
+						"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3NjdiNTZlZC1jMWM5LTQwZWUtOTFlOS1kMzZjNzQ2YzJhNTQiLCJlbWFpbCI6Ik5lbW9AU2Vuc2VpLmNvbSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IlVzZXIiLCJqdGkiOiI1ZjgxZTVjZi0zNTBmLTRhMDAtOGU0NS01Yjc2NjgzYzlhMDYiLCJuYmYiOjE3NTUzMzQ5NTcsImV4cCI6MTc1NTMzODU1NywiaXNzIjoiSGFiaXRUcmFja2VyIiwiYXVkIjoiSGFiaXRUcmFja2VyQ2xpZW50In0.FFGzfYpW8xqWgYn6NVtQiYGz32CxE0BqPw3-OU3l-Wo",
+						"type": "string"
+					}
+				]
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"packages": {},
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://localhost:7284/api"
+		},
+		{
+			"key": "emailAddress",
+			"value": "Nemo@Sensei.com"
+		},
+		{
+			"key": "password",
+			"value": "P@ssword1!"
+		},
+		{
+			"key": "jwtToken",
+			"value": "",
+			"description": {
+				"content": "",
+				"type": "text/plain"
+			}
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"description": {
+				"content": "",
+				"type": "text/plain"
+			}
+		}
+	]
+}
